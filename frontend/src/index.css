@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --sbloom-canvas: #FAF7F2;
+    --sbloom-surface: #F3ECE1;
+    --sbloom-text-main: #12101F;
+    --sbloom-text-secondary: #575266;
+    --sbloom-border: #E8E2D8;
+    --sbloom-violet: #6B3CFF;
+    --sbloom-magenta: #FF4FA3;
+    --sbloom-lime: #D6F36B;
+    --sbloom-admin: #0E0B1E;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--sbloom-canvas);
+    color: var(--sbloom-text-main);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: 'Fraunces', Georgia, serif;
+    font-feature-settings: 'opsz' 32;
+  }
+}
+
+/* Glassmorphism and Custom Micro-decorations */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--sbloom-border);
+}
+
+.glass-panel-dark {
+  background: rgba(14, 11, 30, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Subtle dot grid pattern */
+.bg-grid-pattern {
+  background-image: radial-gradient(rgba(18, 16, 31, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Pulse animation for live status badge */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(214, 243, 107, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(214, 243, 107, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(214, 243, 107, 0);
+  }
+}
+
+.pulse-active {
+  animation: pulse-ring 2s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
