@@ -254,7 +254,7 @@ export const HealthCard: React.FC<HealthCardProps> = ({
         )}
 
         {/* Active Modules & Foundation Checklist */}
-        {isConnected && health.data && (
+        {isConnected && health.data && health.data.modules_ready && health.data.modules_ready.length > 0 && (
           <div className="space-y-3">
             <h3 className="font-fraunces text-base font-semibold text-sbloom-text-main flex items-center space-x-2">
               <span>Initialized Core Modules</span>
@@ -264,7 +264,7 @@ export const HealthCard: React.FC<HealthCardProps> = ({
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-              {health.data.modules_ready.map((mod, index) => (
+              {health.data.modules_ready.map((mod: string, index: number) => (
                 <div
                   key={index}
                   className="flex items-center space-x-2.5 p-3 rounded-xl bg-sbloom-canvas border border-sbloom-border/70 text-xs font-medium text-sbloom-text-main"
@@ -276,6 +276,7 @@ export const HealthCard: React.FC<HealthCardProps> = ({
             </div>
           </div>
         )}
+
 
         {/* Raw Telemetry JSON Toggle */}
         <div className="pt-2 border-t border-sbloom-border/70">

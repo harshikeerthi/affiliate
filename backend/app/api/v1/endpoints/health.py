@@ -1,70 +1,43 @@
 from datetime import datetime, timezone
 import time
-from typing import Dict, Any, List
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
-
 from app.core.config import settings
+from app.schemas.health import HealthResponse
 
 router = APIRouter()
 
-# Record backend startup timestamp
 START_TIME = time.time()
-
-
-class DatabaseInfo(BaseModel):
-    connected: bool = Field(False, description="Whether the database is currently connected")
-    provider: str = Field("Supabase (Scheduled for Phase 2)", description="Planned database provider")
-    status_note: str = Field(
-        "Database integration will be connected in Phase 2. Foundation phase runs mock-ready.",
-        description="Notice on database status",
-    )
-
-
-class HealthResponse(BaseModel):
-    status: str = Field("healthy", description="Overall health status of the service")
-    service: str = Field(..., description="Service identifier")
-    version: str = Field(..., description="Application version")
-    environment: str = Field(..., description="Deployment environment")
-    timestamp: str = Field(..., description="Current UTC timestamp (ISO 8601)")
-    uptime_seconds: float = Field(..., description="Uptime duration in seconds")
-    database: DatabaseInfo = Field(..., description="Database connection status metadata")
-    modules_ready: List[str] = Field(..., description="List of initialized architectural modules")
-    message: str = Field(..., description="Human-readable status summary")
 
 
 @router.get(
     "/health",
     response_model=HealthResponse,
-    summary="Health and Readiness Check",
-    description="Returns detailed health diagnostics, uptime, and foundation readiness for sBLOOM Affiliate Portal.",
+    summary="Health and Diagnostics Telemetry",
+    description="Returns backend uptime, environment, in-memory storage mode, and Phase 2 database disclaimer.",
 )
-def get_health() -> Dict[str, Any]:
-    """
-    Check if the sBLOOM backend service is running and responsive.
-    This endpoint is polled by the frontend portal to display live connectivity.
-    """
+def get_health() -> HealthResponse:
+    """Check service health and in-memory demo status."""
     now = datetime.now(timezone.utc).isoformat()
     uptime = round(time.time() - START_TIME, 2)
 
-    return {
-        "status": "healthy",
-        "service": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT,
-        "timestamp": now,
-        "uptime_seconds": uptime,
-        "database": {
-            "connected": False,
-            "provider": "Supabase (Scheduled for Phase 2)",
-            "status_note": "Database integration will be connected in Phase 2. Foundation phase runs mock-ready.",
-        },
-        "modules_ready": [
+    return HealthResponse(
+        status="healthy",
+        service=settings.PROJECT_NAME,
+        version=settings.VERSION,
+        environment=settings.ENVIRONMENT,
+        timestamp=now,
+        uptime_seconds=uptime,
+        storage_mode=settings.STORAGE_MODE,
+        database_connected=settings.DATABASE_CONNECTED,
+        storage_notice="DEMO IN-MEMORY STORAGE: All state is kept in memory and resets on server restart. No real database (Supabase) is connected in this phase.",
+        modules_ready=[
             "FastAPI Core Engine",
-            "CORS Middleware Configuration",
-            "API v1 Routing Architecture",
-            "Pydantic v2 Environment Schemas",
-            "Health Diagnostics Telemetry",
+            "Affiliate Management API",
+            "Leads Referral Pipeline",
+            "Services & Commission Catalog",
+            "In-Memory Session Store",
+            "CORS & Security Middleware",
         ],
-        "message": "sBLOOM Affiliate Portal backend is online and operational.",
-    }
+        message="sBLOOM Affiliate Portal backend is running smoothly in demo mode.",
+    )
+

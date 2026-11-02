@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings and environment configuration."""
+    """Application settings for sBLOOM Affiliate Portal Backend."""
 
     ENVIRONMENT: str = "development"
     PROJECT_NAME: str = "sBLOOM Affiliate Portal API"
@@ -15,13 +15,15 @@ class Settings(BaseSettings):
     PORT: int = 8000
     RELOAD: bool = True
 
-    # List of origins allowed to make Cross-Origin HTTP requests
+    # CORS restricted to local frontend development origins only
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
     ]
+
+    # In-memory demo disclaimer
+    STORAGE_MODE: str = "in_memory_temporary"
+    DATABASE_CONNECTED: bool = False
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

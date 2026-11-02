@@ -3,8 +3,13 @@ import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { Table, Column } from '../../components/ui/Table';
-import { INITIAL_SAMPLE_LEADS, Lead } from '../../data/sampleLeads';
+import { Table } from '../../components/ui/Table';
+import type { Column } from '../../components/ui/Table';
+import { INITIAL_SAMPLE_LEADS } from '../../data/sampleLeads';
+import type { Lead } from '../../data/sampleLeads';
+
+
+
 import { 
   Users2, 
   TrendingUp, 

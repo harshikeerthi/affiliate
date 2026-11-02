@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { SAMPLE_INVOICES, InvoiceItem } from '../../data/sampleEarnings';
-import { Table, Column } from '../../components/ui/Table';
+import { SAMPLE_INVOICES } from '../../data/sampleEarnings';
+import type { InvoiceItem } from '../../data/sampleEarnings';
+
+import { Table } from '../../components/ui/Table';
+import type { Column } from '../../components/ui/Table';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { FileText, Download, CheckCircle2, ShieldCheck, Printer } from 'lucide-react';

@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { INITIAL_SAMPLE_LEADS, Lead, LeadStatus } from '../../data/sampleLeads';
-import { Table, Column } from '../../components/ui/Table';
+import { INITIAL_SAMPLE_LEADS } from '../../data/sampleLeads';
+import type { Lead, LeadStatus } from '../../data/sampleLeads';
+
+import { Table } from '../../components/ui/Table';
+import type { Column } from '../../components/ui/Table';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ConfirmationDialog } from '../../components/ui/Modal';

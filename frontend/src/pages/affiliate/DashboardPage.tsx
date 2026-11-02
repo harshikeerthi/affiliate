@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Wallet, 
@@ -8,30 +8,60 @@ import {
   PlusCircle, 
   Copy, 
   Check, 
-  ExternalLink,
   ArrowRight,
   Sparkles,
-  Briefcase
+  Briefcase,
+  RefreshCw,
+  AlertTriangle 
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { Table, Column } from '../../components/ui/Table';
+import { Table } from '../../components/ui/Table';
+import type { Column } from '../../components/ui/Table';
 import { LeadDrawer } from '../../components/features/LeadDrawer';
-import { INITIAL_SAMPLE_LEADS, Lead } from '../../data/sampleLeads';
-import { SAMPLE_SERVICES } from '../../data/sampleServices';
+
+import { DemoDataNotice } from '../../components/ui/DemoDataNotice';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { apiClient } from '../../services/api';
+import type { LeadItem, ServiceCatalogItem } from '../../types/api';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
   
-  const [leads, setLeads] = useState<Lead[]>(INITIAL_SAMPLE_LEADS);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [services, setServices] = useState<ServiceCatalogItem[]>([]);
+  const [selectedLead, setSelectedLead] = useState<LeadItem | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'create'>('create');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [leadsRes, servicesRes] = await Promise.all([
+        apiClient.getLeads({ limit: 10 }),
+        apiClient.getServices(),
+      ]);
+      setLeads(leadsRes.leads || []);
+      setServices(servicesRes.services || []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to connect to backend.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const handleCopyLink = () => {
     if (user?.referralCode) {
@@ -47,59 +77,76 @@ export const DashboardPage: React.FC = () => {
     setIsDrawerOpen(true);
   };
 
-  const handleOpenViewDrawer = (lead: Lead) => {
+  const handleOpenViewDrawer = (lead: LeadItem) => {
     setSelectedLead(lead);
     setDrawerMode('view');
     setIsDrawerOpen(true);
   };
 
-  const handleAddNewLead = (newLeadData: Omit<Lead, 'id' | 'submittedDate' | 'isDemoSample'>) => {
-    const newLead: Lead = {
-      ...newLeadData,
-      id: `LEAD-${Math.floor(9050 + Math.random() * 100)}`,
-      submittedDate: 'Just now',
-      isDemoSample: true,
-    };
-    setLeads([newLead, ...leads]);
+  const handleLeadCreated = (newLead: LeadItem) => {
+    setLeads((prev) => [newLead, ...prev]);
   };
 
   const recentLeads = leads.slice(0, 4);
 
-  const columns: Column<Lead>[] = [
+  // Dynamic calculations for demo metrics
+  const convertedCount = leads.filter((l) => l.status === 'Converted').length;
+  const pendingCount = leads.filter((l) => l.status === 'Pending' || l.status === 'Contacted').length;
+
+  const columns: Column<LeadItem>[] = [
     {
       header: 'Reference',
-      render: (row) => <span className="font-mono font-bold text-sbloom-violet">{row.id}</span>,
+      render: (row) => (
+        <span className="font-mono font-bold text-sbloom-violet text-xs">
+          {row.reference_number || row.id}
+        </span>
+      ),
     },
     {
-      header: 'Client / Company',
+      header: 'Client / Business',
       render: (row) => (
         <div>
-          <span className="font-semibold block">{row.clientName}</span>
-          <span className="text-[11px] text-sbloom-text-secondary">{row.companyName}</span>
+          <span className="font-semibold block text-sbloom-text-main">{row.contact_name}</span>
+          <span className="text-[11px] text-sbloom-text-secondary">{row.business_name}</span>
         </div>
       ),
     },
     {
       header: 'Service Referred',
-      accessor: 'serviceName',
+      render: (row) => (
+        <span className="text-xs text-sbloom-text-secondary">
+          {row.services_of_interest?.length ? row.services_of_interest.join(', ') : 'Enterprise Pipeline'}
+        </span>
+      ),
     },
     {
       header: 'Status',
       render: (row) => <StatusBadge status={row.status} size="sm" />,
     },
     {
-      header: 'Est. Commission',
-      render: (row) => <span className="font-bold font-fraunces text-xs">{row.commissionEst}</span>,
+      header: 'Est. Commission (Demo)',
+      render: (row) => (
+        <span className="font-bold font-fraunces text-xs text-sbloom-text-main">
+          {row.estimated_commission}
+        </span>
+      ),
     },
     {
-      header: 'Date',
-      accessor: 'submittedDate',
+      header: 'Submitted',
+      render: (row) => (
+        <span className="text-xs text-sbloom-text-secondary">
+          {row.created_at ? new Date(row.created_at).toLocaleDateString() : 'Just now'}
+        </span>
+      ),
     },
   ];
 
   return (
     <div className="space-y-6">
       
+      {/* Demo Notice */}
+      <DemoDataNotice />
+
       {/* Welcome Banner Card */}
       <div className="relative rounded-3xl bg-gradient-to-r from-sbloom-surface via-[#f7f2e9] to-white border border-sbloom-border p-6 sm:p-8 overflow-hidden shadow-sbloom">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -138,6 +185,22 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Backend Alert if disconnected */}
+      {error && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-start justify-between text-xs">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Backend Communication Warning: </span>
+              <span>{error}</span>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchDashboardData}>
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -151,9 +214,8 @@ export const DashboardPage: React.FC = () => {
           <div className="text-2xl font-bold font-fraunces text-sbloom-text-main">
             ₹1,42,500
           </div>
-          <p className="text-[11px] text-sbloom-text-secondary mt-1 flex items-center space-x-1">
-            <span className="text-[#6fa014] font-bold">+18.4%</span>
-            <span>vs previous month</span>
+          <p className="text-[10px] text-amber-700 font-medium mt-1">
+            Simulated demonstration metric
           </p>
         </Card>
 
@@ -165,10 +227,10 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl font-bold font-fraunces text-sbloom-text-main">
-            ₹38,000
+            {pendingCount} Active
           </div>
           <p className="text-[11px] text-sbloom-text-secondary mt-1">
-            2 deals in final audit stage
+            In review / qualification
           </p>
         </Card>
 
@@ -180,10 +242,10 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl font-bold font-fraunces text-sbloom-text-main">
-            12 Deals
+            {convertedCount} Closed
           </div>
           <p className="text-[11px] text-sbloom-text-secondary mt-1">
-            Lifetime closed clients
+            {leads.length} total referrals recorded
           </p>
         </Card>
 
@@ -195,10 +257,10 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl font-bold font-fraunces text-sbloom-text-main">
-            28.5%
+            {leads.length > 0 ? `${((convertedCount / leads.length) * 100).toFixed(1)}%` : '0%'}
           </div>
           <p className="text-[11px] text-sbloom-text-secondary mt-1">
-            Above ecosystem average (21%)
+            Based on recorded leads
           </p>
         </Card>
 
@@ -212,7 +274,7 @@ export const DashboardPage: React.FC = () => {
               Recent Lead Activity
             </h3>
             <p className="text-xs text-sbloom-text-secondary">
-              Click any lead row to audit attribution and commission timeline.
+              Real-time records from FastAPI backend <code className="font-mono text-sbloom-violet">GET /api/v1/leads</code>
             </p>
           </div>
           <Link to="/app/leads">
@@ -222,12 +284,20 @@ export const DashboardPage: React.FC = () => {
           </Link>
         </div>
 
-        <Table
-          columns={columns}
-          data={recentLeads}
-          keyExtractor={(item) => item.id}
-          onRowClick={(row) => handleOpenViewDrawer(row)}
-        />
+        {isLoading ? (
+          <div className="p-8 text-center rounded-2xl bg-white border border-sbloom-border space-y-2">
+            <RefreshCw className="w-5 h-5 animate-spin text-sbloom-violet mx-auto" />
+            <p className="text-xs text-sbloom-text-secondary">Syncing with FastAPI backend...</p>
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            data={recentLeads}
+            keyExtractor={(item) => item.id}
+            emptyMessage="No customer leads recorded yet. Click 'Submit Lead' to get started."
+            onRowClick={(row) => handleOpenViewDrawer(row)}
+          />
+        )}
       </div>
 
       {/* Featured Services Mini Showcase */}
@@ -242,7 +312,7 @@ export const DashboardPage: React.FC = () => {
                 Top Services Ready for Promotion
               </h4>
               <p className="text-[11px] text-sbloom-text-secondary">
-                Generate custom referral links and access client pitches.
+                From FastAPI catalog: <code className="font-mono text-sbloom-violet">GET /api/v1/services</code>
               </p>
             </div>
           </div>
@@ -255,7 +325,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {SAMPLE_SERVICES.slice(0, 2).map((srv) => (
+          {services.slice(0, 2).map((srv) => (
             <div
               key={srv.id}
               className="p-4 rounded-2xl bg-sbloom-surface border border-sbloom-border flex flex-col justify-between"
@@ -264,15 +334,15 @@ export const DashboardPage: React.FC = () => {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-sbloom-text-main">{srv.name}</span>
                   <span className="text-xs font-bold text-sbloom-violet px-2 py-0.5 rounded-md bg-white border border-sbloom-border">
-                    {srv.commissionRate} Rate
+                    {srv.commission_rate} Rate
                   </span>
                 </div>
                 <p className="text-xs text-sbloom-text-secondary leading-snug">
-                  {srv.tagline}
+                  {srv.description}
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-sbloom-border/70 flex items-center justify-between text-xs">
-                <span className="font-semibold text-sbloom-text-main">Avg: {srv.avgCommission}</span>
+                <span className="font-semibold text-sbloom-text-main">Avg: {srv.avg_commission}</span>
                 <Link to="/app/leads">
                   <Button variant="primary" size="sm">
                     Refer Client
@@ -290,9 +360,11 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         selectedLead={selectedLead}
         mode={drawerMode}
-        onSubmitLead={handleAddNewLead}
+        servicesList={services}
+        onLeadCreated={handleLeadCreated}
       />
 
     </div>
   );
 };
+

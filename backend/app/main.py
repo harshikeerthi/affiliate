@@ -10,9 +10,10 @@ from app.api.v1.endpoints.health import get_health
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan context for startup and shutdown routines."""
+    """Application lifespan context for server startup and shutdown."""
     print(f"[STARTUP] {settings.PROJECT_NAME} (v{settings.VERSION}) starting on {settings.HOST}:{settings.PORT}")
-    print(f"[CORS] Allowed origins: {settings.BACKEND_CORS_ORIGINS}")
+    print(f"[CORS] Allowed local frontend origins: {settings.BACKEND_CORS_ORIGINS}")
+    print("[STORAGE] In-Memory Demo Storage active. Data resets on server restart.")
     yield
     print(f"[SHUTDOWN] {settings.PROJECT_NAME} shutting down gracefully")
 
@@ -20,45 +21,60 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Backend API foundation for the sBLOOM Affiliate Portal.",
+    description=(
+        "Backend API foundation for the sBLOOM Affiliate Portal.\n\n"
+        "### Architecture & Demo Limitations:\n"
+        "- **In-Memory Storage**: Current endpoints operate on temporary in-memory collections.\n"
+        "- **Database Deferred**: Supabase integration is scheduled for Phase 2.\n"
+        "- **Password Handling**: Passwords are salted and hashed (PBKDF2-SHA256), never stored in plain text.\n"
+        "- **Local CORS**: Restricted to local frontend origins (`http://localhost:5173`, `http://127.0.0.1:5173`)."
+    ),
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
 
-# Set up Cross-Origin Resource Sharing (CORS)
+# CORS Middleware restricted strictly to local frontend origins
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[str(origin).rstrip("/") for origin in settings.BACKEND_CORS_ORIGINS],
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
-# Include v1 API router (e.g. /api/v1/health)
+# Include v1 API router (/api/v1/...)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Top-level /health endpoint alias for convenience
-@app.get("/health", tags=["Health"], summary="Top-level Health Check Alias")
-def top_level_health():
-    """Top-level health endpoint alias to /api/v1/health."""
+
+# Top-level GET /health endpoint requested
+@app.get("/health", tags=["Health"], summary="Top-Level Health Check Endpoint")
+def root_health():
+    """Top-level health check endpoint."""
     return get_health()
 
 
 # Welcome endpoint at root
 @app.get("/", tags=["Root"])
 def root_info():
-    """Returns portal backend metadata and quick documentation links."""
+    """Root metadata and documentation navigation."""
     return JSONResponse(
         content={
             "app": settings.PROJECT_NAME,
             "status": "online",
             "version": settings.VERSION,
             "docs_url": "/docs",
-            "health_check_url": f"{settings.API_V1_STR}/health",
-            "phase": "Foundation Phase (Database deferred to Phase 2)",
-            "brand": "sBLOOM Affiliate Portal",
+            "health_endpoint": "/health",
+            "api_v1_endpoints": {
+                "health": f"{settings.API_V1_STR}/health",
+                "affiliates_register_demo": f"{settings.API_V1_STR}/affiliates/register-demo",
+                "affiliates_me": f"{settings.API_V1_STR}/affiliates/me",
+                "leads": f"{settings.API_V1_STR}/leads",
+                "services": f"{settings.API_V1_STR}/services",
+            },
+            "storage_mode": settings.STORAGE_MODE,
+            "database_connected": settings.DATABASE_CONNECTED,
         }
     )

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { Table, Column } from '../../components/ui/Table';
+import { Table } from '../../components/ui/Table';
+import type { Column } from '../../components/ui/Table';
 import { EARNINGS_METRICS } from '../../data/sampleEarnings';
+
 import { 
   Wallet, 
   Clock, 

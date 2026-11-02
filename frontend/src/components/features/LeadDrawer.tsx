@@ -5,16 +5,29 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { Button } from '../ui/Button';
 import { StatusBadge } from '../ui/StatusBadge';
-import { SAMPLE_SERVICES } from '../../data/sampleServices';
-import { Lead } from '../../data/sampleLeads';
-import { CheckCircle2, Building, Mail, Phone, Calendar, DollarSign, Sparkles } from 'lucide-react';
+import { apiClient } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import type { LeadItem, ServiceCatalogItem } from '../../types/api';
+import { 
+  CheckCircle2, 
+  Building, 
+  Mail, 
+  Phone, 
+  Calendar, 
+  MapPin, 
+  Briefcase, 
+  AlertTriangle, 
+  Sparkles,
+  Info 
+} from 'lucide-react';
 
 interface LeadDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedLead: Lead | null;
+  selectedLead: LeadItem | null;
   mode: 'view' | 'create';
-  onSubmitLead: (newLead: Omit<Lead, 'id' | 'submittedDate' | 'isDemoSample'>) => void;
+  servicesList?: ServiceCatalogItem[];
+  onLeadCreated?: (newLead: LeadItem) => void;
 }
 
 export const LeadDrawer: React.FC<LeadDrawerProps> = ({
@@ -22,30 +35,47 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
   onClose,
   selectedLead,
   mode,
-  onSubmitLead,
+  servicesList = [],
+  onLeadCreated,
 }) => {
+  const { user } = useAuth();
+
   // Form State
-  const [clientName, setClientName] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [serviceId, setServiceId] = useState(SAMPLE_SERVICES[0].id);
+  const [location, setLocation] = useState('Hyderabad, Telangana');
+  const [sector, setSector] = useState('Healthcare');
+  const [serviceId, setServiceId] = useState(
+    servicesList.length > 0 ? servicesList[0].id : 'srv-whatsapp-automation'
+  );
+  const [requirements, setRequirements] = useState('');
+  const [preferredMeeting, setPreferredMeeting] = useState('');
+  const [consent, setConsent] = useState(false);
   const [notes, setNotes] = useState('');
-  
-  // Validation & UI State
+
+  // UI & Network Feedback State
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(false);
+  const [createdRefNumber, setCreatedRefNumber] = useState<string | null>(null);
 
   const resetForm = () => {
-    setClientName('');
-    setCompanyName('');
+    setBusinessName('');
+    setContactName('');
     setEmail('');
     setPhone('');
-    setServiceId(SAMPLE_SERVICES[0].id);
+    setLocation('Hyderabad, Telangana');
+    setSector('Healthcare');
+    setServiceId(servicesList.length > 0 ? servicesList[0].id : 'srv-whatsapp-automation');
+    setRequirements('');
+    setPreferredMeeting('');
+    setConsent(false);
     setNotes('');
     setErrors({});
-    setSuccessMessage(false);
+    setServerError(null);
+    setCreatedRefNumber(null);
   };
 
   const handleClose = () => {
@@ -55,8 +85,8 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    if (!clientName.trim()) newErrors.clientName = 'Client full name is required.';
-    if (!companyName.trim()) newErrors.companyName = 'Company name is required.';
+    if (!businessName.trim()) newErrors.businessName = 'Business or organization name is required.';
+    if (!contactName.trim()) newErrors.contactName = 'Contact person full name is required.';
     if (!email.trim()) {
       newErrors.email = 'Email address is required.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -65,44 +95,88 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
     if (!phone.trim()) {
       newErrors.phone = 'Contact phone number is required.';
     }
+    if (!location.trim()) {
+      newErrors.location = 'Location / city is required.';
+    }
+    if (!requirements.trim() || requirements.trim().length < 10) {
+      newErrors.requirements = 'Please describe requirements with at least 10 characters.';
+    }
+    if (!consent) {
+      newErrors.consent = 'Explicit consent is required to process and refer client data.';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null);
+
+    // Prevent duplicate submission
+    if (isSubmitting) return;
+
     if (!validate()) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const selectedService = SAMPLE_SERVICES.find((s) => s.id === serviceId) || SAMPLE_SERVICES[0];
-      
-      onSubmitLead({
-        clientName,
-        companyName,
-        email,
-        phone,
-        serviceId,
-        serviceName: selectedService.name,
-        estimatedValue: '₹95,000',
-        commissionEst: selectedService.avgCommission.split(' /')[0],
-        status: 'Pending',
-        notes: notes || 'Direct referral submitted by affiliate.',
+
+    try {
+      // Connect to FastAPI endpoint: POST /api/v1/leads
+      const createdLead = await apiClient.createLead({
+        business_name: businessName.trim(),
+        contact_name: contactName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        location: location.trim(),
+        sector,
+        services_of_interest: [serviceId],
+        business_requirements: requirements.trim(),
+        preferred_meeting_datetime: preferredMeeting || undefined,
+        timezone: 'Asia/Kolkata',
+        consent,
+        affiliate_code: user?.referralCode || 'SBLOOM-HARSHI-78',
+        notes: notes.trim() || undefined,
       });
 
-      setIsSubmitting(false);
-      setSuccessMessage(true);
+      // API confirmed success: display the returned reference number
+      setCreatedRefNumber(createdLead.reference_number);
+
+      if (onLeadCreated) {
+        onLeadCreated(createdLead);
+      }
+
+      // Close drawer after short visual confirmation
       setTimeout(() => {
         handleClose();
-      }, 1500);
-    }, 600);
+      }, 1800);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to submit lead to backend.';
+      setServerError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const serviceOptions = SAMPLE_SERVICES.map((s) => ({
-    value: s.id,
-    label: `${s.name} (${s.commissionRate} commission)`,
-  }));
+  const sectorOptions = [
+    { value: 'Healthcare', label: 'Healthcare & Clinics' },
+    { value: 'Education', label: 'Education & Academies' },
+    { value: 'Professional Services', label: 'Professional Services & Consulting' },
+    { value: 'Technology & Enterprise', label: 'Technology & Enterprise' },
+    { value: 'Retail & E-commerce', label: 'Retail & E-commerce' },
+  ];
+
+  const serviceOptions = servicesList.length > 0
+    ? servicesList.map((s) => ({
+        value: s.id,
+        label: `${s.name} (${s.category})`,
+      }))
+    : [
+        { value: 'srv-whatsapp-automation', label: 'WhatsApp Automation (Healthcare)' },
+        { value: 'srv-website-building', label: 'Website Building (Professional Services)' },
+        { value: 'srv-seo', label: 'Search Engine Optimization - SEO (Healthcare)' },
+        { value: 'srv-google-ads', label: 'Google Ads (Education)' },
+        { value: 'srv-meta-ads', label: 'Meta Ads (Professional Services)' },
+      ];
 
   return (
     <Drawer
@@ -111,95 +185,191 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
       title={mode === 'create' ? 'Submit New Customer Lead' : 'Lead Details & Commission Audit'}
       subtitle={
         mode === 'create'
-          ? 'Enter your referred client information to lock your commission.'
-          : selectedLead ? `Reference ID: ${selectedLead.id}` : ''
+          ? 'Connected to FastAPI backend POST /api/v1/leads'
+          : selectedLead ? `Reference ID: ${selectedLead.reference_number || selectedLead.id}` : ''
       }
       width="lg"
     >
       {mode === 'create' ? (
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          {successMessage && (
-            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center space-x-2 text-xs">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-              <span className="font-semibold">
-                Lead submitted successfully! It has been added to your tracking table.
-              </span>
+          {/* Server Error Alert */}
+          {serverError && (
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-start space-x-2 text-xs">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Backend Error: </span>
+                <span>{serverError}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Success Confirmation with Returned Reference Number */}
+          {createdRefNumber && (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start space-x-2.5 text-xs">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">
+                  Lead successfully recorded by FastAPI Backend!
+                </span>
+                <span className="text-[11px] text-emerald-800">
+                  Assigned Reference: <strong className="font-mono">{createdRefNumber}</strong>. Added to your live My Leads list.
+                </span>
+              </div>
             </div>
           )}
 
           <div className="p-3 rounded-xl bg-sbloom-surface border border-sbloom-border text-xs text-sbloom-text-secondary flex items-start space-x-2">
-            <Sparkles className="w-4 h-4 text-sbloom-violet flex-shrink-0 mt-0.5" />
+            <Info className="w-4 h-4 text-sbloom-violet flex-shrink-0 mt-0.5" />
             <span>
-              All fields marked with <span className="text-sbloom-magenta font-bold">*</span> are required for attribution tracking.
+              All fields marked with <span className="text-sbloom-magenta font-bold">*</span> are validated by the FastAPI backend schema.
             </span>
           </div>
 
           <Input
-            label="Client Contact Name"
-            placeholder="e.g. Rajesh Kumar"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            errorMessage={errors.clientName}
+            label="Business / Organization Name"
+            placeholder="e.g. Apex Cloud Solutions Pvt Ltd"
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value)}
+            errorMessage={errors.businessName}
             required
+            disabled={isSubmitting}
+            leftIcon={<Building className="w-4 h-4" />}
           />
 
           <Input
-            label="Client Company / Organization"
-            placeholder="e.g. Zenitron Technologies"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            errorMessage={errors.companyName}
+            label="Contact Person Name"
+            placeholder="e.g. Vikramaditya Sharma"
+            value={contactName}
+            onChange={(e) => setContactName(e.target.value)}
+            errorMessage={errors.contactName}
             required
-            leftIcon={<Building className="w-4 h-4" />}
+            disabled={isSubmitting}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Client Email"
+              label="Business Email"
               type="email"
-              placeholder="rajesh@zenitron.in"
+              placeholder="vikram@apexcloud.in"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               errorMessage={errors.email}
               required
+              disabled={isSubmitting}
               leftIcon={<Mail className="w-4 h-4" />}
             />
 
             <Input
-              label="Client Phone / WhatsApp"
-              placeholder="+91 98450 12345"
+              label="Phone / WhatsApp"
+              placeholder="+91 98450 11223"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               errorMessage={errors.phone}
               required
+              disabled={isSubmitting}
               leftIcon={<Phone className="w-4 h-4" />}
             />
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Location / City"
+              placeholder="e.g. Hyderabad, India"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              errorMessage={errors.location}
+              required
+              disabled={isSubmitting}
+              leftIcon={<MapPin className="w-4 h-4" />}
+            />
+
+            <Select
+              label="Industry Sector"
+              options={sectorOptions}
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              disabled={isSubmitting}
+              required
+            />
+          </div>
+
           <Select
-            label="Referred Service"
+            label="Service of Interest"
             options={serviceOptions}
             value={serviceId}
             onChange={(e) => setServiceId(e.target.value)}
-            helperText="Commission is credited based on this service tier upon closing."
+            disabled={isSubmitting}
+            helperText="Commission rate is automatically calculated upon deal qualification."
             required
           />
 
           <Textarea
-            label="Additional Notes / Client Needs"
-            placeholder="Describe client's timeline, budget, or key pain points..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            label="Business Requirements & Project Scope"
+            placeholder="Describe client's team size, pain points, or automation goals (min 10 characters)..."
+            value={requirements}
+            onChange={(e) => setRequirements(e.target.value)}
+            errorMessage={errors.requirements}
+            disabled={isSubmitting}
             rows={3}
+            required
           />
 
+          <Input
+            label="Preferred Meeting Date & Time (Optional)"
+            type="datetime-local"
+            value={preferredMeeting}
+            onChange={(e) => setPreferredMeeting(e.target.value)}
+            disabled={isSubmitting}
+            leftIcon={<Calendar className="w-4 h-4" />}
+          />
+
+          <Textarea
+            label="Internal Affiliate Notes (Optional)"
+            placeholder="Context on how you connected with this lead..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            disabled={isSubmitting}
+            rows={2}
+          />
+
+          {/* Explicit Consent Checkbox */}
+          <div className="pt-1">
+            <label className="flex items-start space-x-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                disabled={isSubmitting}
+                className="mt-0.5 rounded text-sbloom-violet focus:ring-sbloom-violet border-sbloom-border"
+              />
+              <span className="text-xs text-sbloom-text-secondary leading-tight">
+                <span className="text-sbloom-magenta font-bold">*</span> Client has provided explicit consent to be contacted regarding sBLOOM enterprise services.
+              </span>
+            </label>
+            {errors.consent && (
+              <p className="text-xs text-red-600 mt-1 font-medium">{errors.consent}</p>
+            )}
+          </div>
+
           <div className="pt-4 border-t border-sbloom-border flex items-center justify-end space-x-3">
-            <Button type="button" variant="outline" size="md" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="md" isLoading={isSubmitting}>
-              Submit Lead
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              disabled={isSubmitting}
+              isLoading={isSubmitting}
+            >
+              {isSubmitting ? 'Recording on Backend...' : 'Submit Lead'}
             </Button>
           </div>
 
@@ -210,19 +380,19 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
           {/* Header Card */}
           <div className="p-4 rounded-2xl bg-white border border-sbloom-border space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs text-sbloom-text-secondary font-semibold">
-                {selectedLead.id}
+              <span className="font-mono text-xs text-sbloom-violet font-bold">
+                {selectedLead.reference_number || selectedLead.id}
               </span>
               <StatusBadge status={selectedLead.status} />
             </div>
 
             <div>
               <h4 className="font-fraunces text-lg font-bold text-sbloom-text-main">
-                {selectedLead.clientName}
+                {selectedLead.business_name}
               </h4>
               <p className="text-xs text-sbloom-text-secondary flex items-center space-x-1.5 mt-0.5">
-                <Building className="w-3.5 h-3.5 text-sbloom-violet" />
-                <span>{selectedLead.companyName}</span>
+                <span>Contact:</span>
+                <span className="font-semibold text-sbloom-text-main">{selectedLead.contact_name}</span>
               </p>
             </div>
           </div>
@@ -241,39 +411,43 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
               <span>{selectedLead.phone}</span>
             </div>
             <div className="flex items-center space-x-2">
+              <MapPin className="w-3.5 h-3.5 text-sbloom-violet" />
+              <span>{selectedLead.location} ({selectedLead.sector})</span>
+            </div>
+            <div className="flex items-center space-x-2">
               <Calendar className="w-3.5 h-3.5 text-sbloom-violet" />
-              <span>Submitted on {selectedLead.submittedDate}</span>
+              <span>Submitted: {new Date(selectedLead.created_at).toLocaleString()}</span>
             </div>
           </div>
 
-          {/* Service & Commission Calculation */}
+          {/* Commission Breakdown */}
           <div className="p-4 rounded-2xl bg-white border border-sbloom-border space-y-3">
             <h5 className="font-bold text-sbloom-text-secondary uppercase text-[10px] tracking-wider">
-              Commission Breakdown
+              Commission Breakdown (Simulated Demo)
             </h5>
             <div className="flex items-center justify-between pb-2 border-b border-sbloom-border/60">
-              <span className="text-sbloom-text-secondary">Selected Service</span>
-              <span className="font-semibold">{selectedLead.serviceName}</span>
+              <span className="text-sbloom-text-secondary">Selected Services</span>
+              <span className="font-semibold">{selectedLead.services_of_interest?.join(', ') || 'Enterprise Pipeline'}</span>
             </div>
             <div className="flex items-center justify-between pb-2 border-b border-sbloom-border/60">
               <span className="text-sbloom-text-secondary">Estimated Deal Value</span>
-              <span className="font-semibold">{selectedLead.estimatedValue}</span>
+              <span className="font-semibold">{selectedLead.estimated_value}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="font-bold text-sbloom-violet">Estimated Commission</span>
               <span className="font-bold font-fraunces text-base text-sbloom-text-main">
-                {selectedLead.commissionEst}
+                {selectedLead.estimated_commission}
               </span>
             </div>
           </div>
 
-          {/* Referral Notes */}
+          {/* Requirements & Notes */}
           <div className="p-4 rounded-2xl bg-sbloom-canvas border border-sbloom-border space-y-1.5">
             <h5 className="font-bold text-sbloom-text-secondary uppercase text-[10px] tracking-wider">
-              Affiliate Submission Notes
+              Project Requirements
             </h5>
             <p className="text-xs text-sbloom-text-secondary leading-relaxed">
-              {selectedLead.notes}
+              {selectedLead.business_requirements}
             </p>
           </div>
 

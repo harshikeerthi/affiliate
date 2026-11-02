@@ -21,7 +21,7 @@ interface TopBarProps {
 
 export const TopBar: React.FC<TopBarProps> = ({ onToggleMobileMenu, isAdmin = false }) => {
   const { language, setLanguage, t, isTeluguDraft } = useLanguage();
-  const { user, logout, toggleRole } = useAuth();
+  const { user, logout, toggleRole, backendConnected, backendLatency, checkConnection } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [copiedLink, setCopiedLink] = useState(false);
@@ -68,6 +68,22 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleMobileMenu, isAdmin = fa
       {/* Right: Actions, Language Switcher, User Menu */}
       <div className="flex items-center space-x-3">
         
+        {/* Backend Connection Indicator */}
+        <button
+          onClick={checkConnection}
+          className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border transition-colors ${
+            backendConnected
+              ? 'bg-sbloom-lime/20 border-sbloom-lime/50 text-sbloom-text-main'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}
+          title="Click to check backend health status"
+        >
+          <span className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-[#6fa014] animate-pulse' : 'bg-red-500'}`} />
+          <span className="text-[11px] font-semibold">
+            {backendConnected ? `API Live (${backendLatency}ms)` : 'API Offline'}
+          </span>
+        </button>
+
         {/* Quick Link Copy Button (Affiliate View) */}
         {!isAdmin && user && (
           <button

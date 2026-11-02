@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Zap, CheckCircle2, ShieldCheck, ArrowRight, User, Mail, Phone, Lock } from 'lucide-react';
+import { Zap, CheckCircle2, AlertTriangle, ArrowRight, User, Mail, Phone, Lock, Info } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
@@ -8,8 +8,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
 export const SignupPage: React.FC = () => {
-  const { signup } = useAuth();
-  const { t } = useLanguage();
+  const { registerDemo } = useAuth();
+  const { t, language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
   // Form State
@@ -22,8 +22,9 @@ export const SignupPage: React.FC = () => {
 
   // Validation & UI State
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [successNotice, setSuccessNotice] = useState(false);
+  const [registeredReferralCode, setRegisteredReferralCode] = useState<string | null>(null);
 
   const categoryOptions = [
     { value: 'Tech & Digital Creators', label: 'Tech & Digital Creators' },
@@ -57,28 +58,68 @@ export const SignupPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null);
+
+    // Prevent duplicate form submission if already loading
+    if (isLoading) return;
+
     if (!validate()) return;
 
     setIsLoading(true);
 
-    // Business rule: Direct activation, simulated network request without approval waiting screen!
-    setTimeout(() => {
-      signup({ name, email, phone, category });
-      setIsLoading(false);
-      setSuccessNotice(true);
+    try {
+      // Connects to FastAPI endpoint: POST /api/v1/affiliates/register-demo
+      const profile = await registerDemo({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+        category,
+        consent: agreedToTerms,
+      });
 
-      // Instant transition directly to dashboard
+      // Display success only after the backend confirms
+      setRegisteredReferralCode(profile.referral_code);
+
+      // Instant transition directly to dashboard without approval waiting screen
       setTimeout(() => {
         navigate('/app');
-      }, 900);
-    }, 600);
+      }, 1200);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed. Please check backend connection.';
+      setServerError(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-sbloom-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans selection:bg-sbloom-lime">
       
+      {/* Top Language Toggle */}
+      <div className="absolute top-6 right-6 flex items-center space-x-2">
+        <div className="flex items-center p-1 rounded-xl bg-sbloom-surface border border-sbloom-border text-xs">
+          <button
+            onClick={() => setLanguage('en')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              language === 'en' ? 'bg-white text-sbloom-text-main shadow-2xs' : 'text-sbloom-text-secondary'
+            }`}
+          >
+            EN
+          </button>
+          <button
+            onClick={() => setLanguage('te')}
+            className={`px-2.5 py-1 rounded-lg font-bold font-telugu transition-all ${
+              language === 'te' ? 'bg-sbloom-violet text-white shadow-2xs' : 'text-sbloom-text-secondary'
+            }`}
+          >
+            తెలుగు
+          </button>
+        </div>
+      </div>
+
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
         <Link to="/" className="inline-flex items-center space-x-2">
@@ -104,19 +145,42 @@ export const SignupPage: React.FC = () => {
           <div className="p-3.5 rounded-2xl bg-sbloom-surface border border-sbloom-border flex items-start space-x-3 text-xs text-sbloom-text-main">
             <Zap className="w-4 h-4 text-sbloom-violet flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold">Instant Account Activation: </span>
+              <span className="font-bold">Direct Account Activation: </span>
               <span className="text-sbloom-text-secondary">
-                No manual approval wait times. Submit this form to start generating referral links immediately.
+                No manual approval queues. Connected directly to FastAPI demo registration.
               </span>
             </div>
           </div>
 
-          {successNotice && (
+          {/* Demo limitations disclaimer */}
+          <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 text-[11px] flex items-start space-x-2">
+            <Info className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <span>
+              <strong>Demo Environment:</strong> Registration is stored in temporary in-memory storage. Passwords are salted & hashed (PBKDF2). Database integration is deferred to Phase 2.
+            </span>
+          </div>
+
+          {/* Server Error Alert */}
+          {serverError && (
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-start space-x-2 text-xs">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Registration Failed: </span>
+                <span>{serverError}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Success Alert */}
+          {registeredReferralCode && (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center space-x-2 text-xs">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-              <span className="font-semibold">
-                Account activated! Redirecting directly to your active dashboard...
-              </span>
+              <div>
+                <span className="font-semibold block">
+                  Account created on FastAPI backend! Assigned Referral Code: <strong>{registeredReferralCode}</strong>
+                </span>
+                <span className="text-[11px] text-emerald-700">Redirecting directly to your active dashboard...</span>
+              </div>
             </div>
           )}
 
@@ -129,6 +193,7 @@ export const SignupPage: React.FC = () => {
               onChange={(e) => setName(e.target.value)}
               errorMessage={errors.name}
               required
+              disabled={isLoading}
               leftIcon={<User className="w-4 h-4" />}
             />
 
@@ -140,6 +205,7 @@ export const SignupPage: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               errorMessage={errors.email}
               required
+              disabled={isLoading}
               leftIcon={<Mail className="w-4 h-4" />}
             />
 
@@ -150,6 +216,7 @@ export const SignupPage: React.FC = () => {
               onChange={(e) => setPhone(e.target.value)}
               errorMessage={errors.phone}
               required
+              disabled={isLoading}
               leftIcon={<Phone className="w-4 h-4" />}
             />
 
@@ -158,6 +225,7 @@ export const SignupPage: React.FC = () => {
               options={categoryOptions}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
+              disabled={isLoading}
               required
             />
 
@@ -169,6 +237,8 @@ export const SignupPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               errorMessage={errors.password}
               required
+              disabled={isLoading}
+              helperText="Minimum 6 characters. Hashed with salt before storage."
               leftIcon={<Lock className="w-4 h-4" />}
             />
 
@@ -179,6 +249,7 @@ export const SignupPage: React.FC = () => {
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  disabled={isLoading}
                   className="mt-0.5 rounded text-sbloom-violet focus:ring-sbloom-violet border-sbloom-border"
                 />
                 <span className="text-xs text-sbloom-text-secondary leading-tight">
@@ -196,9 +267,10 @@ export const SignupPage: React.FC = () => {
               size="lg"
               className="w-full mt-4"
               isLoading={isLoading}
+              disabled={isLoading}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              Activate Partner Account & Enter
+              {isLoading ? 'Creating Partner Account...' : 'Activate Partner Account & Enter'}
             </Button>
 
           </form>

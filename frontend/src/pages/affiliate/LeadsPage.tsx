@@ -1,37 +1,70 @@
-import React, { useState } from 'react';
-import { INITIAL_SAMPLE_LEADS, Lead, LeadStatus } from '../../data/sampleLeads';
-import { Table, Column } from '../../components/ui/Table';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table } from '../../components/ui/Table';
+import type { Column } from '../../components/ui/Table';
+
+
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { LeadDrawer } from '../../components/features/LeadDrawer';
 import { DemoDataNotice } from '../../components/ui/DemoDataNotice';
-import { PlusCircle, Search, Filter, Sparkles, Building, Eye } from 'lucide-react';
+import { PlusCircle, Search, Sparkles, Building, Eye, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { apiClient } from '../../services/api';
+import type { LeadItem, ServiceCatalogItem } from '../../types/api';
 
 export const LeadsPage: React.FC = () => {
   const { t } = useLanguage();
-  const [leads, setLeads] = useState<Lead[]>(INITIAL_SAMPLE_LEADS);
+  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [services, setServices] = useState<ServiceCatalogItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [isLoading, setIsLoading] = useState(true);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'view'>('create');
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<LeadItem | null>(null);
 
-  const statuses: ('All' | LeadStatus)[] = ['All', 'Pending', 'Contacted', 'Qualified', 'Converted', 'Rejected'];
+  const statuses = ['All', 'Pending', 'Contacted', 'Qualified', 'Converted', 'Rejected'] as const;
 
-  const filteredLeads = leads.filter((lead) => {
-    const matchesSearch =
-      lead.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.id.toLowerCase().includes(searchTerm.toLowerCase());
+  // Load leads from FastAPI backend: GET /api/v1/leads
+  const fetchLeads = useCallback(async () => {
+    setIsLoading(true);
+    setServerError(null);
+    try {
+      const response = await apiClient.getLeads({
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+        search: searchTerm.trim() || undefined,
+      });
+      setLeads(response.leads || []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch leads from backend.';
+      setServerError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [statusFilter, searchTerm]);
 
-    const matchesStatus = statusFilter === 'All' || lead.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Load services for LeadDrawer dropdown
+  const fetchServices = async () => {
+    try {
+      const data = await apiClient.getServices();
+      setServices(data.services || []);
+    } catch {
+      // Services will fallback to static defaults in LeadDrawer if API unavailable
+    }
+  };
+
+
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  useEffect(() => {
+    fetchServices();
+  }, []);
 
   const handleOpenCreateDrawer = () => {
     setSelectedLead(null);
@@ -39,42 +72,45 @@ export const LeadsPage: React.FC = () => {
     setIsDrawerOpen(true);
   };
 
-  const handleOpenViewDrawer = (lead: Lead) => {
+  const handleOpenViewDrawer = (lead: LeadItem) => {
     setSelectedLead(lead);
     setDrawerMode('view');
     setIsDrawerOpen(true);
   };
 
-  const handleAddNewLead = (newLeadData: Omit<Lead, 'id' | 'submittedDate' | 'isDemoSample'>) => {
-    const newLead: Lead = {
-      ...newLeadData,
-      id: `LEAD-${Math.floor(9050 + Math.random() * 100)}`,
-      submittedDate: 'Just now',
-      isDemoSample: true,
-    };
-    setLeads([newLead, ...leads]);
+  const handleLeadCreated = (newLead: LeadItem) => {
+    // Add new lead at the top of the list immediately
+    setLeads((prev) => [newLead, ...prev]);
   };
 
-  const columns: Column<Lead>[] = [
+  const columns: Column<LeadItem>[] = [
     {
-      header: 'Lead ID',
-      render: (row) => <span className="font-mono font-bold text-sbloom-violet">{row.id}</span>,
+      header: 'Reference ID',
+      render: (row) => (
+        <span className="font-mono font-bold text-sbloom-violet text-xs">
+          {row.reference_number || row.id}
+        </span>
+      ),
     },
     {
-      header: 'Client & Company',
+      header: 'Client & Business',
       render: (row) => (
         <div>
-          <span className="font-semibold text-sbloom-text-main block">{row.clientName}</span>
+          <span className="font-semibold text-sbloom-text-main block">{row.contact_name}</span>
           <span className="text-[11px] text-sbloom-text-secondary flex items-center space-x-1 mt-0.5">
             <Building className="w-3 h-3 text-sbloom-text-secondary" />
-            <span>{row.companyName}</span>
+            <span>{row.business_name}</span>
           </span>
         </div>
       ),
     },
     {
       header: 'Referred Service',
-      accessor: 'serviceName',
+      render: (row) => (
+        <span className="text-xs text-sbloom-text-secondary">
+          {row.services_of_interest?.length ? row.services_of_interest.join(', ') : 'Enterprise Pipeline'}
+        </span>
+      ),
     },
     {
       header: 'Pipeline Status',
@@ -82,19 +118,30 @@ export const LeadsPage: React.FC = () => {
     },
     {
       header: 'Est. Deal Value',
-      accessor: 'estimatedValue',
-    },
-    {
-      header: 'Est. Commission',
       render: (row) => (
-        <span className="font-bold font-fraunces text-xs text-sbloom-text-main">
-          {row.commissionEst}
+        <span className="text-xs font-semibold text-sbloom-text-main">
+          {row.estimated_value}
         </span>
       ),
     },
     {
+      header: 'Est. Commission (Demo)',
+      render: (row) => (
+        <div>
+          <span className="font-bold font-fraunces text-xs text-sbloom-text-main block">
+            {row.estimated_commission}
+          </span>
+          <span className="text-[9px] text-amber-700 font-medium">Temporary estimate</span>
+        </div>
+      ),
+    },
+    {
       header: 'Submitted',
-      accessor: 'submittedDate',
+      render: (row) => (
+        <span className="text-xs text-sbloom-text-secondary">
+          {row.created_at ? new Date(row.created_at).toLocaleDateString() : 'Just now'}
+        </span>
+      ),
     },
     {
       header: 'Action',
@@ -116,6 +163,9 @@ export const LeadsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       
+      {/* Demo Notice */}
+      <DemoDataNotice />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -123,19 +173,47 @@ export const LeadsPage: React.FC = () => {
             {t('myLeads')}
           </h2>
           <p className="text-xs sm:text-sm text-sbloom-text-secondary mt-1">
-            Track client referrals from initial pitch to deal conversion and commission clearance.
+            Connected to FastAPI backend: <code className="text-xs font-mono bg-sbloom-surface px-1.5 py-0.5 rounded text-sbloom-violet">GET /api/v1/leads</code>. Track customer referrals in real-time.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="md"
-          onClick={handleOpenCreateDrawer}
-          leftIcon={<PlusCircle className="w-4 h-4" />}
-        >
-          {t('submitLead')}
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={fetchLeads}
+            disabled={isLoading}
+            leftIcon={<RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />}
+          >
+            Refresh
+          </Button>
+
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleOpenCreateDrawer}
+            leftIcon={<PlusCircle className="w-4 h-4" />}
+          >
+            {t('submitLead')}
+          </Button>
+        </div>
       </div>
+
+      {/* Server Error Alert */}
+      {serverError && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-start justify-between text-xs">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Failed to load leads from backend: </span>
+              <span>{serverError}</span>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchLeads}>
+            Try Again
+          </Button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-sbloom-border shadow-sbloom">
@@ -166,24 +244,33 @@ export const LeadsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Leads Table */}
-      <Table
-        columns={columns}
-        data={filteredLeads}
-        keyExtractor={(item) => item.id}
-        emptyMessage="No customer leads match the selected filter or search term."
-        onRowClick={(row) => handleOpenViewDrawer(row)}
-      />
+      {/* Leads Table / Loading Skeleton */}
+      {isLoading ? (
+        <div className="p-12 text-center rounded-2xl bg-white border border-sbloom-border space-y-3">
+          <RefreshCw className="w-6 h-6 animate-spin text-sbloom-violet mx-auto" />
+          <p className="text-xs text-sbloom-text-secondary">Loading leads from FastAPI backend...</p>
+        </div>
+      ) : (
+        <Table
+          columns={columns}
+          data={leads}
+          keyExtractor={(item) => item.id}
+          emptyMessage="No customer leads found. Click 'Submit Lead' above to register your first client referral."
+          onRowClick={(row) => handleOpenViewDrawer(row)}
+        />
+      )}
 
-      {/* Lead Drawer */}
+      {/* Lead Drawer (Connected to FastAPI POST /api/v1/leads) */}
       <LeadDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         selectedLead={selectedLead}
         mode={drawerMode}
-        onSubmitLead={handleAddNewLead}
+        servicesList={services}
+        onLeadCreated={handleLeadCreated}
       />
 
     </div>
   );
 };
+

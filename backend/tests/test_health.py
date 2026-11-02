@@ -2,7 +2,7 @@ import sys
 import os
 import unittest
 
-# Ensure backend root is on path for importing 'app'
+# Ensure backend root is in sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -13,44 +13,37 @@ from app.main import app
 
 
 class TestHealthEndpoint(unittest.TestCase):
-    """Test suite for FastAPI health check and root endpoints."""
+    """Test health diagnostics and root endpoints."""
 
     def setUp(self):
         self.client = TestClient(app)
 
-    def test_root_endpoint_returns_200(self):
-        """Test root / metadata endpoint."""
+    def test_root_endpoint_metadata(self):
+        """Verify root / returns 200 and docs link."""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data.get("status"), "online")
-        self.assertIn("sBLOOM", data.get("brand", ""))
+        self.assertIn("/docs", data.get("docs_url", ""))
+        self.assertEqual(data.get("storage_mode"), "in_memory_temporary")
 
-    def test_v1_health_endpoint_success(self):
-        """Test /api/v1/health returns 200 and healthy status."""
-        response = self.client.get("/api/v1/health")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(data.get("status"), "healthy")
-        self.assertEqual(data.get("service"), "sBLOOM Affiliate Portal API")
-        self.assertIn("version", data)
-        self.assertIn("uptime_seconds", data)
-        self.assertGreaterEqual(data["uptime_seconds"], 0)
-
-    def test_top_level_health_alias(self):
-        """Test /health top-level alias matches /api/v1/health response."""
+    def test_top_level_health_endpoint(self):
+        """Verify GET /health returns 200 and in-memory storage notice."""
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data.get("status"), "healthy")
+        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["storage_mode"], "in_memory_temporary")
+        self.assertFalse(data["database_connected"])
+        self.assertIn("IN-MEMORY", data["storage_notice"])
 
-    def test_database_is_not_connected_in_phase_1(self):
-        """Verify that database connection is deferred and correctly flagged as not connected."""
+    def test_v1_health_endpoint_alias(self):
+        """Verify GET /api/v1/health matches root /health."""
         response = self.client.get("/api/v1/health")
+        self.assertEqual(response.status_code, 200)
         data = response.json()
-        db_info = data.get("database", {})
-        self.assertFalse(db_info.get("connected"))
-        self.assertIn("Phase 2", db_info.get("provider", ""))
+        self.assertEqual(data["status"], "healthy")
+        self.assertGreaterEqual(data["uptime_seconds"], 0)
 
 
 if __name__ == "__main__":
