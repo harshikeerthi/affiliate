@@ -21,12 +21,12 @@ export const ProfilePage: React.FC = () => {
   const { user, updateProfile, backendConnected } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
-  const [name, setName] = useState(user?.name || 'Harshitha Rao');
-  const [email, setEmail] = useState(user?.email || 'harshitha.partner@sbloom.demo');
-  const [phone, setPhone] = useState(user?.phone || '+91 98765 43210');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [category, setCategory] = useState(user?.category || 'Tech & Digital Creators');
-  const [payoutUpi, setPayoutUpi] = useState(user?.payoutUpi || 'harshitha@oksbi');
-  const [bankAccount, setBankAccount] = useState('HDFC Bank •••• 4092');
+  const [payoutUpi, setPayoutUpi] = useState(user?.payoutUpi || '');
+  const [bankAccount, setBankAccount] = useState('');
 
   // Notifications
   const [emailAlerts, setEmailAlerts] = useState(user?.notificationEmail ?? true);

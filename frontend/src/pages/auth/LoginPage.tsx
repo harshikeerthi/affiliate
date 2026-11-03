@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
+import { Lock, Mail, ArrowRight } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -22,12 +22,6 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleQuickFill = () => {
-    setEmail('harshitha.partner@sbloom.demo');
-    setPassword('demoPass123');
-    setErrors({});
-  };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -79,27 +73,11 @@ export const LoginPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-sbloom rounded-3xl border border-sbloom-border space-y-6">
-          
-          {/* Quick Demo Fill Pill */}
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-sbloom-surface border border-sbloom-border">
-            <div className="flex items-center space-x-2 text-xs text-sbloom-text-main">
-              <Sparkles className="w-4 h-4 text-sbloom-violet" />
-              <span>Demonstration Mode</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleQuickFill}
-              className="text-xs font-bold text-sbloom-violet hover:underline"
-            >
-              Fill Demo Credentials
-            </button>
-          </div>
-
           <form onSubmit={handleLogin} className="space-y-4">
             <Input
               label="Partner Email"
               type="email"
-              placeholder="harshitha@example.com"
+              placeholder="you@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               errorMessage={errors.email}
