@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Zap, CheckCircle2, AlertTriangle, ArrowRight, User, Mail, Phone, Lock, Info } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
@@ -8,9 +8,15 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
 export const SignupPage: React.FC = () => {
-  const { registerDemo } = useAuth();
+  const { user, registerDemo } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/app', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Form State
   const [name, setName] = useState('');

@@ -14,9 +14,11 @@ export default {
           text: {
             main: "#12101F",
             secondary: "#575266",
+            muted: "#827C94",
           },
           violet: {
             DEFAULT: "#6B3CFF",
+            hover: "#582CD6",
             light: "#845BFF",
             dark: "#5125DB",
           },
@@ -34,6 +36,11 @@ export default {
             DEFAULT: "#0E0B1E",
             card: "#181432",
           },
+          darkStage: "#0E0B1E",
+          darkCard: "#161226",
+          healthcare: "#FF6B6B",
+          education: "#16A34A",
+          proServices: "#0D9488",
         },
       },
       fontFamily: {
@@ -42,6 +49,9 @@ export default {
         sans: ['"Plus Jakarta Sans"', 'sans-serif'],
         body: ['"Plus Jakarta Sans"', 'sans-serif'],
         telugu: ['"Noto Sans Telugu"', '"Plus Jakarta Sans"', 'sans-serif'],
+        teluguHeading: ['"Noto Serif Telugu"', '"Fraunces"', 'serif'],
+        mono: ['"Space Mono"', 'monospace'],
+        label: ['"Space Mono"', 'monospace'],
       },
       boxShadow: {
         'sbloom': '0 10px 30px -5px rgba(18, 16, 31, 0.05), 0 4px 6px -2px rgba(18, 16, 31, 0.03)',

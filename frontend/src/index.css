@@ -8,11 +8,18 @@
     --sbloom-surface: #F3ECE1;
     --sbloom-text-main: #12101F;
     --sbloom-text-secondary: #575266;
+    --sbloom-text-muted: #827C94;
     --sbloom-border: #E8E2D8;
     --sbloom-violet: #6B3CFF;
+    --sbloom-violet-hover: #582CD6;
     --sbloom-magenta: #FF4FA3;
     --sbloom-lime: #D6F36B;
     --sbloom-admin: #0E0B1E;
+    --sbloom-dark-stage: #0E0B1E;
+    --sbloom-dark-card: #161226;
+    --sbloom-healthcare: #FF6B6B;
+    --sbloom-education: #16A34A;
+    --sbloom-pro-services: #0D9488;
   }
 
   html {

@@ -18,6 +18,7 @@ export interface UserProfile {
 
 interface AuthContextType {
   user: UserProfile | null;
+  isAuthenticated: boolean;
   backendConnected: boolean;
   backendLatency: number;
   checkConnection: () => Promise<void>;
@@ -28,7 +29,7 @@ interface AuthContextType {
   updateProfile: (updates: AffiliateUpdateRequest) => Promise<AffiliateProfile>;
 }
 
-const DEFAULT_DEMO_USER: UserProfile = {
+export const DEFAULT_DEMO_USER: UserProfile = {
   id: 'aff-demo-01',
   name: 'Harshitha Rao',
   email: 'harshitha.partner@sbloom.demo',
@@ -51,10 +52,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         return JSON.parse(saved);
       } catch {
-        // Fall back to default
+        // Fall back to null
       }
     }
-    return DEFAULT_DEMO_USER;
+    return null;
   });
 
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
@@ -73,30 +74,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => clearInterval(interval);
   }, [checkConnection]);
 
-  // Load backend profile on mount if connected
+  // Load backend profile on mount if connected and user is logged in
   useEffect(() => {
     const syncProfile = async () => {
       try {
         const profile = await apiClient.getAffiliateProfile();
-        setUser((prev) => ({
-          id: profile.id,
-          name: profile.name,
-          email: profile.email,
-          role: prev?.role || 'affiliate',
-          referralCode: profile.referral_code,
-          phone: profile.phone,
-          category: profile.category,
-          joinedDate: profile.joined_at ? new Date(profile.joined_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'Oct 2026',
-          payoutUpi: profile.payout_upi || '',
-          notificationWhatsapp: profile.notification_whatsapp,
-          notificationEmail: profile.notification_email,
-        }));
+        setUser((prev) => {
+          if (!prev) return null;
+          return {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: prev.role || 'affiliate',
+            referralCode: profile.referral_code,
+            phone: profile.phone,
+            category: profile.category,
+            joinedDate: profile.joined_at ? new Date(profile.joined_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'Oct 2026',
+            payoutUpi: profile.payout_upi || '',
+            notificationWhatsapp: profile.notification_whatsapp,
+            notificationEmail: profile.notification_email,
+          };
+        });
       } catch {
         // In-memory fallback if backend is offline
       }
     };
 
-    syncProfile();
+    if (user) {
+      syncProfile();
+    }
   }, [backendConnected]);
 
   const login = async (email: string, role: 'affiliate' | 'admin' = 'affiliate') => {
@@ -131,26 +137,64 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const registerDemo = async (details: AffiliateRegisterRequest): Promise<AffiliateProfile> => {
-    // Calls FastAPI backend endpoint POST /api/v1/affiliates/register-demo
-    const profile = await apiClient.registerDemoAffiliate(details);
+    try {
+      // Calls FastAPI backend endpoint POST /api/v1/affiliates/register-demo
+      const profile = await apiClient.registerDemoAffiliate(details);
 
-    const newUser: UserProfile = {
-      id: profile.id,
-      name: profile.name,
-      email: profile.email,
-      role: 'affiliate',
-      referralCode: profile.referral_code,
-      phone: profile.phone,
-      category: profile.category,
-      joinedDate: 'Today',
-      payoutUpi: profile.payout_upi || '',
-      notificationWhatsapp: profile.notification_whatsapp,
-      notificationEmail: profile.notification_email,
-    };
+      const newUser: UserProfile = {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: 'affiliate',
+        referralCode: profile.referral_code,
+        phone: profile.phone,
+        category: profile.category,
+        joinedDate: 'Today',
+        payoutUpi: profile.payout_upi || '',
+        notificationWhatsapp: profile.notification_whatsapp,
+        notificationEmail: profile.notification_email,
+      };
 
-    setUser(newUser);
-    localStorage.setItem('sbloom_active_user', JSON.stringify(newUser));
-    return profile;
+      setUser(newUser);
+      localStorage.setItem('sbloom_active_user', JSON.stringify(newUser));
+      return profile;
+    } catch {
+      // Graceful offline fallback if backend server (FastAPI on port 8000) is offline
+      const cleanName = details.name.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 6) || 'PARTNER';
+      const randomSuffix = Math.floor(10 + Math.random() * 90);
+      const fallbackProfile: AffiliateProfile = {
+        id: `aff-local-${Date.now()}`,
+        name: details.name,
+        email: details.email,
+        phone: details.phone,
+        referral_code: `SBLOOM-${cleanName}-${randomSuffix}`,
+        category: details.category,
+        payout_upi: details.payout_upi || '',
+        joined_at: new Date().toISOString(),
+        role: 'affiliate',
+        notification_whatsapp: true,
+        notification_email: true,
+        disclaimer: 'Client-side fallback demo account (Backend offline).',
+      };
+
+      const newUser: UserProfile = {
+        id: fallbackProfile.id,
+        name: fallbackProfile.name,
+        email: fallbackProfile.email,
+        role: 'affiliate',
+        referralCode: fallbackProfile.referral_code,
+        phone: fallbackProfile.phone,
+        category: fallbackProfile.category,
+        joinedDate: 'Today',
+        payoutUpi: fallbackProfile.payout_upi || '',
+        notificationWhatsapp: fallbackProfile.notification_whatsapp,
+        notificationEmail: fallbackProfile.notification_email,
+      };
+
+      setUser(newUser);
+      localStorage.setItem('sbloom_active_user', JSON.stringify(newUser));
+      return fallbackProfile;
+    }
   };
 
   const logout = () => {
@@ -198,6 +242,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
+        isAuthenticated: !!user,
         backendConnected,
         backendLatency,
         checkConnection,

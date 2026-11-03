@@ -1,14 +1,21 @@
 import React, { useState, ReactNode } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AffiliateSidebar } from './AffiliateSidebar';
 import { TopBar } from './TopBar';
 import { Drawer } from '../ui/Drawer';
 import { DemoDataNotice } from '../ui/DemoDataNotice';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 
 export const AffiliateLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isTeluguDraft } = useLanguage();
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (!user) {
+    return <Navigate to="/app/login" state={{ from: location.pathname }} replace />;
+  }
 
   return (
     <div className="flex h-screen bg-sbloom-canvas text-sbloom-text-main overflow-hidden font-sans">
