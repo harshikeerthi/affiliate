@@ -29,20 +29,6 @@ interface AuthContextType {
   updateProfile: (updates: AffiliateUpdateRequest) => Promise<AffiliateProfile>;
 }
 
-export const DEFAULT_DEMO_USER: UserProfile = {
-  id: 'aff-demo-01',
-  name: 'Harshitha Rao',
-  email: 'harshitha.partner@sbloom.demo',
-  role: 'affiliate',
-  referralCode: 'SBLOOM-HARSHI-78',
-  phone: '+91 98765 43210',
-  category: 'Tech & Digital Creators',
-  joinedDate: 'Oct 2026',
-  payoutUpi: 'harshitha@oksbi',
-  notificationWhatsapp: true,
-  notificationEmail: true,
-};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -124,12 +110,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(updatedUser);
       localStorage.setItem('sbloom_active_user', JSON.stringify(updatedUser));
     } catch {
-      // Fallback
+      // Fallback if backend server is offline
+      const username = email.split('@')[0] || 'Partner';
+      const cleanName = username.charAt(0).toUpperCase() + username.slice(1);
+      const referralPrefix = username.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'PARTNER';
+      const randomSuffix = Math.floor(10 + Math.random() * 90);
+
       const fallbackUser: UserProfile = {
-        ...DEFAULT_DEMO_USER,
+        id: `aff-${Date.now()}`,
+        name: role === 'admin' ? 'Admin Controller' : cleanName,
         email,
         role,
-        name: role === 'admin' ? 'Admin Controller' : 'Harshitha Rao',
+        referralCode: `SBLOOM-${referralPrefix}-${randomSuffix}`,
+        phone: '',
+        category: 'Tech & Digital Creators',
+        joinedDate: 'Recent',
+        payoutUpi: '',
+        notificationWhatsapp: true,
+        notificationEmail: true,
       };
       setUser(fallbackUser);
       localStorage.setItem('sbloom_active_user', JSON.stringify(fallbackUser));
@@ -204,12 +202,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const toggleRole = () => {
     setUser((prev) => {
-      if (!prev) return DEFAULT_DEMO_USER;
+      if (!prev) return null;
       const nextRole = prev.role === 'affiliate' ? 'admin' : 'affiliate';
       const updated: UserProfile = {
         ...prev,
         role: nextRole,
-        name: nextRole === 'admin' ? 'Admin Controller' : (prev.name === 'Admin Controller' ? 'Harshitha Rao' : prev.name),
+        name: nextRole === 'admin' ? 'Admin Controller' : (prev.name === 'Admin Controller' ? 'Partner' : prev.name),
       };
       localStorage.setItem('sbloom_active_user', JSON.stringify(updated));
       return updated;
